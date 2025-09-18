@@ -1,0 +1,40 @@
+name: PUSH_TO_ECR
+on: 
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Docker image tag'
+        type: string
+        required: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      # Checkout
+      - name: Code Checkout
+        uses: actions/checkout@v5
+
+      # AWS Configure Credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5.0.0
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::617207029505:role/ECRAccessForGiHubActions
+
+      # AWS ECR Login
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # DOCKER BUILD, TAG, PUSH
+      - name: Build, tag, and push docker image to Amazon ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ap597-development-02/nginx
+          IMAGE_TAG: ${{ github.event.inputs.tag_name }}
+        run: |
+          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
