@@ -14,7 +14,7 @@ env:
     ACCOUNT_ID_DESTINATION: ${{ vars.ACCOUNT_ID_DESTINATION }}
     REGION_SOURCE: ${{ vars.REGION_SOURCE }}
     REGION_DESTINATION: ${{ vars.REGION_DESTINATION }}
-    IMAGES_EXISTS: false
+    IMAGES_EXISTS: "false"
 
 jobs:
   pull-images:
@@ -66,7 +66,7 @@ jobs:
               echo "************ All Images for Repository $REPO_NAME on account $REGION_SOURCE are Pulled! ************" >> migration.log
 
   tag-images:
-    if: ${{ IMAGES_EXISTS == 'true' }}
+    if: ${{ IMAGES_EXISTS == "true" }}
     needs: [pull-images]
     env:
       TAG_VARIABLE: ${{ needs.pull-images.outputs.TAG_VARIABLE }}
@@ -87,7 +87,7 @@ jobs:
           echo "************ Tags Updated for All Images! ************" >> migration.log
 
   push-images:
-    if: ${{ IMAGES_EXISTS == 'true' }}
+    if: ${{ IMAGES_EXISTS == "true" }}
     needs: [pull-images, tag-images]
     env:
       TAG_VARIABLE: ${{ needs.pull-images.outputs.TAG_VARIABLE }}
