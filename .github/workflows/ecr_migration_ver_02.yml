@@ -44,14 +44,14 @@ jobs:
           TAG_VARIABLE=$(aws ecr list-images --repository-name ${{ github.event.inputs.repository_name }} --query 'imageIds[].imageTag' --output text)
 
           if [[ -z "$TAG_VARIABLE" ]]; then
-              echo "IMAGES_EXIST=false" >> $GITHUB_ENV
+              echo "IMAGES_EXIST=false" >> $GITHUB_OUTPUT
               echo "************ ECR Repository - ${{ github.event.inputs.repository_name }} on account ${{ env.ACCOUNT_ID_SOURCE }} has no Images - Nothing to Migrate ************" >> migration_no_images.log
               echo "************ END ************" >> migration_no_images.log
               echo "************ END - CHECK MIGRATION LOG FOR MORE INFO ************"
 
           else
               echo "************ Starting ECR Migration for repo ${{ github.event.inputs.repository_name }} on account ${{ env.ACCOUNT_ID_DESTINATION }} ************" >> migration.log
-              echo "IMAGES_EXIST=true" >> $GITHUB_ENV
+              echo "IMAGES_EXIST=true" >> $GITHUB_OUTPUT
               echo "TAG_VARIABLE=$TAG_VARIABLE" >> $GITHUB_ENV
 
               # PULL IMAGES
@@ -75,7 +75,7 @@ jobs:
               echo "************ Tags Updated for All Images! ************" >> migration.log
 
       # AWS Configure Credentials --> General Account
-      - if: $IMAGES_EXIST == "true"
+      - if: ${{ steps.check-images.outputs.IMAGES_EXIST == true }}
         name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v5.0.0
         with:
@@ -83,13 +83,13 @@ jobs:
           role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID_DESTINATION }}:role/ECRAccessForGiHubActions-General
 
       # AWS ECR Login
-      - if: $IMAGES_EXIST == "true"
+      - if: ${{ steps.check-images.outputs.IMAGES_EXIST == true }}
         name: Login to Amazon ECR
         id: login-ecr-gen
         uses: aws-actions/amazon-ecr-login@v2
 
       # Push Images
-      - if: $IMAGES_EXIST == "true"
+      - if: ${{ steps.check-images.outputs.IMAGES_EXIST == true }}
         name: Push Images
         run: |
           echo "************ Create ECR Repository - ${{ github.event.inputs.repository_name }} on account ${{ env.ACCOUNT_ID_DESTINATION }} ************" >> migration.log
@@ -106,7 +106,8 @@ jobs:
           echo "************ END - CHECK MIGRATION LOG FOR MORE INFO ************"    
 
       # Upload Log Artifacts
-      - uses: actions/upload-artifact@v4
+      - if: ${{ always() }}
+        uses: actions/upload-artifact@v4
         with:
           name: ecr-migration-log
           if-no-files-found: error
