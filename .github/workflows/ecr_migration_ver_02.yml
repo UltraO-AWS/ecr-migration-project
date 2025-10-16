@@ -73,11 +73,11 @@ jobs:
                   docker tag ${{ env.ACCOUNT_ID_SOURCE }}.dkr.ecr.${{ env.REGION_SOURCE }}.amazonaws.com/${{ github.event.inputs.repository_name }}:$tag ${{ env.ACCOUNT_ID_DESTINATION }}.dkr.ecr.${{ env.REGION_DESTINATION }}.amazonaws.com/${{ github.event.inputs.repository_name }}:$tag           
               done
               echo "************ Tags Updated for All Images! ************" >> migration.log
-              
+
           fi
 
       # AWS Configure Credentials --> General Account
-      - if: ${{ steps.check-images.outputs.IMAGES_EXIST == true }}
+      - if: ${{ steps.check-images.outputs.IMAGES_EXIST == 'true' }}
         name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v5.0.0
         with:
@@ -85,13 +85,13 @@ jobs:
           role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID_DESTINATION }}:role/ECRAccessForGiHubActions-General
 
       # AWS ECR Login
-      - if: ${{ steps.check-images.outputs.IMAGES_EXIST == true }}
+      - if: ${{ steps.check-images.outputs.IMAGES_EXIST == 'true' }}
         name: Login to Amazon ECR
         id: login-ecr-gen
         uses: aws-actions/amazon-ecr-login@v2
 
       # Push Images
-      - if: ${{ steps.check-images.outputs.IMAGES_EXIST == true }}
+      - if: ${{ steps.check-images.outputs.IMAGES_EXIST == 'true' }}
         name: Push Images
         run: |
           echo "************ Create ECR Repository - ${{ github.event.inputs.repository_name }} on account ${{ env.ACCOUNT_ID_DESTINATION }} ************" >> migration.log
