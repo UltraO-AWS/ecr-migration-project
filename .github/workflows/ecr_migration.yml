@@ -110,6 +110,7 @@ jobs:
           echo "************ CLEANUP ************"
           docker rmi $(docker images -a -q) -f
           echo "************ CLEANUP DONE! ************"
+          docker image ls
 
       # Upload Log Artifacts
       - if: ${{ always() }}
