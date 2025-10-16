@@ -82,7 +82,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v5.0.0
         with:
           aws-region: us-east-1
-          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID_DESTINATION }}:role/ECRAccessForGiHubActions-General
+          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID_DESTINATION }}:role/ECRAccessForGitHubActions-General
 
       # AWS ECR Login
       - if: ${{ steps.check-images.outputs.IMAGES_EXIST == 'true' }}
