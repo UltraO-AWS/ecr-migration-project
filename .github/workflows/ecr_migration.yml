@@ -1,4 +1,4 @@
-name: ECR_MIGRATION_VER_02
+name: ECR_MIGRATION
 on: 
   workflow_dispatch:
     inputs:
@@ -105,7 +105,11 @@ jobs:
           done
           
           echo "************ All Images Pushed to Account ${{ env.ACCOUNT_ID_DESTINATION }}! ************" >> migration.log
-          echo "************ END - CHECK MIGRATION LOG FOR MORE INFO ************"    
+          echo "************ END - CHECK MIGRATION LOG FOR MORE INFO ************"
+
+          echo "************ CLEANUP ************"
+          docker rmi $(docker images -a -q) -f
+          echo "************ CLEANUP DONE! ************"
 
       # Upload Log Artifacts
       - if: ${{ always() }}
