@@ -17,7 +17,7 @@ env:
 
 jobs:
   pull-images:
-    runs-on: [self-hosted, ecr-runner]
+    runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
@@ -70,7 +70,7 @@ jobs:
     needs: [pull-images]
     env:
       TAG_VARIABLE: ${{ needs.pull-images.outputs.TAG_VARIABLE }}
-    runs-on: [self-hosted, ecr-runner]
+    runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
@@ -91,7 +91,7 @@ jobs:
     needs: [pull-images, tag-images]
     env:
       TAG_VARIABLE: ${{ needs.pull-images.outputs.TAG_VARIABLE }}
-    runs-on: [self-hosted, ecr-runner]
+    runs-on: ubuntu-latest
     steps:
       # AWS Configure Credentials
       - name: Configure AWS Credentials
