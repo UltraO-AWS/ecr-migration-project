@@ -1,4 +1,4 @@
-name: ECR_MIGRATION
+name: ECR_MIGRATION_VER_02
 on: 
   workflow_dispatch:
     inputs:
