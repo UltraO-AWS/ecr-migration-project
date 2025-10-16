@@ -1,0 +1,114 @@
+name: ECR_MIGRATION
+on: 
+  workflow_dispatch:
+    inputs:
+      repository_name:
+        description: 'Repository On Source Account'
+        type: string
+        required: true
+
+env:
+    TAG_VALUE: ${{ vars.TAG_VALUE }}
+    TAG_KEY: ${{ vars.TAG_KEY }}
+    ACCOUNT_ID_SOURCE: ${{ vars.ACCOUNT_ID_SOURCE }}
+    ACCOUNT_ID_DESTINATION: ${{ vars.ACCOUNT_ID_DESTINATION }}
+    REGION_SOURCE: ${{ vars.REGION_SOURCE }}
+    REGION_DESTINATION: ${{ vars.REGION_DESTINATION }}
+
+jobs:
+  pull-images:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+
+      # AWS Configure Credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5.0.0
+        with:
+          aws-region: us-west-2
+          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID_SOURCE }}:role/ECRAccessForGiHubActions
+
+      # AWS ECR Login
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Check All Images
+      - name: Check All Images For Repository - ${{ github.event.inputs.repository_name }} + Tag
+        id: check-images
+        run: |
+          echo "************ STARTING ECR MIGRATION ************"
+          
+          TAG_VARIABLE=$(aws ecr list-images --repository-name ${{ github.event.inputs.repository_name }} --query 'imageIds[].imageTag' --output text)
+
+          if [[ -z "$TAG_VARIABLE" ]]; then
+              echo "IMAGES_EXIST=false" >> $GITHUB_ENV
+              echo "************ ECR Repository - ${{ github.event.inputs.repository_name }} on account ${{ env.ACCOUNT_ID_SOURCE }} has no Images - Nothing to Migrate ************" >> migration_no_images.log
+              echo "************ END ************" >> migration_no_images.log
+              echo "************ END - CHECK MIGRATION LOG FOR MORE INFO ************"
+
+          else
+              echo "************ Starting ECR Migration for repo ${{ github.event.inputs.repository_name }} on account ${{ env.ACCOUNT_ID_DESTINATION }} ************" >> migration.log
+              echo "IMAGES_EXIST=true" >> $GITHUB_ENV
+              echo "TAG_VARIABLE=$TAG_VARIABLE" >> $GITHUB_ENV
+
+              # PULL IMAGES
+              
+              for tag in $TAG_VARIABLE; 
+                do
+                    echo "Pulling $tag"
+                    echo "************ Pulling Image ${{ github.event.inputs.repository_name }}:$tag! ************" >> migration.log
+                    docker pull ${{ env.ACCOUNT_ID_SOURCE }}.dkr.ecr.${{ env.REGION_SOURCE }}.amazonaws.com/${{ github.event.inputs.repository_name }}:$tag
+                    echo "************ ${{ github.event.inputs.repository_name }}:$tag Pulled to local! ************" >> migration.log
+                done
+              echo "************ All Images for Repository ${{ github.event.inputs.repository_name }} on account ${{ env.REGION_SOURCE }} are Pulled! ************" >> migration.log
+
+              # TAG IMAGES
+
+              for tag in $TAG_VARIABLE; 
+              do
+                  echo "Update $tag"
+                  docker tag ${{ env.ACCOUNT_ID_SOURCE }}.dkr.ecr.${{ env.REGION_SOURCE }}.amazonaws.com/${{ github.event.inputs.repository_name }}:$tag ${{ env.ACCOUNT_ID_DESTINATION }}.dkr.ecr.${{ env.REGION_DESTINATION }}.amazonaws.com/${{ github.event.inputs.repository_name }}:$tag           
+              done
+              echo "************ Tags Updated for All Images! ************" >> migration.log
+
+      # AWS Configure Credentials --> General Account
+      - if: $IMAGES_EXIST == true
+        name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5.0.0
+        with:
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID_DESTINATION }}:role/ECRAccessForGiHubActions-General
+
+      # AWS ECR Login
+      - if: $IMAGES_EXIST == true
+        name: Login to Amazon ECR
+        id: login-ecr-gen
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Push Images
+      - if: $IMAGES_EXIST == true
+        name: Push Images
+        run: |
+          echo "************ Create ECR Repository - ${{ github.event.inputs.repository_name }} on account ${{ env.ACCOUNT_ID_DESTINATION }} ************" >> migration.log
+          aws ecr create-repository --repository-name ${{ github.event.inputs.repository_name }} --region ${{ env.REGION_DESTINATION }} --image-tag-mutability MUTABLE --encryption-configuration encryptionType=AES256 --image-scanning-configuration scanOnPush=false --tags Key=${{ env.TAG_KEY }},Value=${{ env.TAG_VALUE }}
+          
+          for tag in $TAG_VARIABLE; 
+          do
+              echo "Push $tag"
+              docker push ${{ env.ACCOUNT_ID_DESTINATION }}.dkr.ecr.${{ env.REGION_DESTINATION }}.amazonaws.com/${{ github.event.inputs.repository_name }}:$tag
+              echo "************ Image ${{ env.ACCOUNT_ID_DESTINATION }}.dkr.ecr.${{ env.REGION_DESTINATION }}.amazonaws.com/${{ github.event.inputs.repository_name }}:$tag Pushed to Account ${{ env.ACCOUNT_ID_DESTINATION }}! ************" >> migration.log
+          done
+          
+          echo "************ All Images Pushed to Account ${{ env.ACCOUNT_ID_DESTINATION }}! ************" >> migration.log
+          echo "************ END - CHECK MIGRATION LOG FOR MORE INFO ************"    
+
+      # Upload Log Artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ecr-migration-log
+          if-no-files-found: error
+          path: |
+            ${{ github.workspace }}/*.log
