@@ -14,7 +14,6 @@ env:
     ACCOUNT_ID_DESTINATION: ${{ vars.ACCOUNT_ID_DESTINATION }}
     REGION_SOURCE: ${{ vars.REGION_SOURCE }}
     REGION_DESTINATION: ${{ vars.REGION_DESTINATION }}
-    IMAGES_EXISTS: "false"
 
 jobs:
   pull-images:
@@ -24,6 +23,7 @@ jobs:
       contents: read
     outputs:
       TAG_VARIABLE: ${{ steps.check-images.outputs.TAG_VARIABLE }}
+      IMAGES_EXISTS: ${{ steps.check-images.outputs.IMAGES_EXISTS }}
     steps:
 
       # AWS Configure Credentials
@@ -47,14 +47,14 @@ jobs:
           TAG_VARIABLE=$(aws ecr list-images --repository-name $REPO_NAME --query 'imageIds[].imageTag' --output text)
 
           if [[ -z "$TAG_VARIABLE" ]]; then
-
+              echo "IMAGES_EXISTS=false" >> $GITHUB_OUTPUT
               echo "************ ECR Repository - $REPO_NAME on account $ACCOUNT_ID_SOURCE has no Images - Nothing to Migrate ************" >> migration_no_images.log
               echo "************ END ************" >> migration_no_images.log
               echo "************ END - CHECK MIGRATION LOG FOR MORE INFO ************"
 
           else
               echo "************ Starting ECR Migration for repo $REPO_NAME on account $ACCOUNT_ID_DESTINATION ************" >> migration.log
-              echo "IMAGES_EXISTS=true" >> $GITHUB_ENV
+              echo "IMAGES_EXISTS=true" >> $GITHUB_OUTPUT
               echo "TAG_VARIABLE=$TAG_VARIABLE" >> $GITHUB_OUTPUT
               for tag in $TAG_VARIABLE; 
                 do
@@ -66,7 +66,7 @@ jobs:
               echo "************ All Images for Repository $REPO_NAME on account $REGION_SOURCE are Pulled! ************" >> migration.log
 
   tag-images:
-    if: ${{ IMAGES_EXISTS == true }}
+    if: ${{ needs.pull-images.outputs.IMAGES_EXISTS == "true" }}
     needs: [pull-images]
     env:
       TAG_VARIABLE: ${{ needs.pull-images.outputs.TAG_VARIABLE }}
@@ -87,7 +87,7 @@ jobs:
           echo "************ Tags Updated for All Images! ************" >> migration.log
 
   push-images:
-    if: ${{ IMAGES_EXISTS == true }}
+    if: ${{ needs.pull-images.outputs.IMAGES_EXISTS == "true" }}
     needs: [pull-images, tag-images]
     env:
       TAG_VARIABLE: ${{ needs.pull-images.outputs.TAG_VARIABLE }}
